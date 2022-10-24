@@ -8,15 +8,17 @@ router.get('/', (req, res) => {
   // find all products
   // include its associated Category and Tag data
   Product.findAll({
-    attributes: [id, product_name, price, stock, category_id],
-    include: [{
-      model: Category,
-      attributes: [id, category_name],
-      include: {
+    //attributes: ['id', 'product_name', 'price', 'stock', 'category_id'],
+    include: [
+      {
+        model: Category,
+        attributes: ['id', 'category_name']
+      },
+      {
         model: Tag,
-        attributes: [id, tag_name]
+        attributes: ['id', 'tag_name']
       }
-    }]
+    ]
   })
     .then(dbProductData => res.json(dbProductData))
     .catch(err => {
@@ -33,15 +35,14 @@ router.get('/:id', (req, res) => {
     where: {
       id: req.params.id
     },
-    attributes: [id, product_name, price, stock, category_id],
     include: [
       {
         model: Category,
-        attributes: [id, category_name],
-        include: {
-          model: Tag,
-          attributes: [id, tag_name]
-        }
+        attributes: ['id', 'category_name']
+      },
+      {
+        model: Tag,
+        attributes: ['id', 'tag_name']
       }
     ]
   })
@@ -58,6 +59,35 @@ router.get('/:id', (req, res) => {
     });
 });
 
+function isNumeric(n) {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+function validateProduct(item) {
+  const result = {};
+  if (!isNumeric(item.price)) {
+    const err = 'Price is not a number';
+    result.isError = true;
+    result.message = err;
+  } else if (parseFloat(item.price) <= 0){
+    const err = 'Price has to be greater than 0';
+    result.isError = true;
+    result.message = err;
+  } else if (!isNumeric(item.stock)) {
+    const err = 'Stock is not a number';
+    result.isError = true;
+    result.message = err;
+  } else if (parseInt(item.stock) < 1){
+    const err = 'Stock has to be greater than 0';
+    result.isError = true;
+    result.message = err;
+  } else {
+    result.isError = false;
+  }
+
+  return result;
+}
+
 // create new product
 router.post('/', (req, res) => {
   /* req.body should look like this...
@@ -68,6 +98,12 @@ router.post('/', (req, res) => {
       tagIds: [1, 2, 3, 4]
     }
   */
+  const validation = validateProduct(req.body);
+  if (validation.isError) {
+    console.log(validation.message);
+    res.status(400).json(validation.message);
+    return;
+  }
   Product.create(req.body)
     .then((product) => {
       // if there's product tags, we need to create pairings to bulk create in the ProductTag model
@@ -92,6 +128,12 @@ router.post('/', (req, res) => {
 
 // update product
 router.put('/:id', (req, res) => {
+  const validation = validateProduct(req.body);
+  if (validation.isError) {
+    console.log(validation.message);
+    res.status(400).json(validation.message);
+    return;
+  }
   // update product data
   Product.update(req.body, {
     where: {
